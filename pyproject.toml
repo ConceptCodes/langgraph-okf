@@ -1,0 +1,36 @@
+[project]
+name = "langgraph-okf"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+authors = [
+    { name = "David Ojo", email = "conceptcodes@gmail.com" }
+]
+requires-python = ">=3.14"
+dependencies = [
+    "pydantic-settings>=2.15.0",
+]
+
+[project.scripts]
+langgraph-okf = "langgraph_okf:main"
+
+[build-system]
+requires = ["uv_build>=0.12.10,<0.13.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
+    "ruff>=0.16.6",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py314"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
