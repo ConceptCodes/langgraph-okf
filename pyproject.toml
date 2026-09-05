@@ -11,6 +11,11 @@ dependencies = [
     "pydantic-settings>=2.15.0",
 ]
 
+[project.urls]
+Homepage = "https://github.com/ConceptCodes/langgraph-okf"
+Repository = "https://github.com/ConceptCodes/langgraph-okf"
+Issues = "https://github.com/ConceptCodes/langgraph-okf/issues"
+
 [project.scripts]
 langgraph-okf = "langgraph_okf:main"
 
