@@ -1,7 +1,7 @@
 [project]
 name = "langgraph-okf"
 version = "0.1.0"
-description = "Add your description here"
+description = "An example of a LangGraph agent that uses Google's OKF consumer spec"
 readme = "README.md"
 authors = [
     { name = "David Ojo", email = "conceptcodes@gmail.com" }
