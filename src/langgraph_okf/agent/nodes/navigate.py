@@ -6,6 +6,7 @@ from typing import Any
 from langgraph.runtime import Runtime
 
 from langgraph_okf.agent.context import Context
+from langgraph_okf.agent.reasoning import select_candidates
 from langgraph_okf.agent.state import LegalDiscoveryState
 
 logger = logging.getLogger(__name__)
@@ -26,6 +27,7 @@ def navigate_index_node(state: LegalDiscoveryState, runtime: Runtime[Context]) -
     pending = deque(active_dirs)
     visited_dirs: set[str] = set()
     fallback_ids: list[str] = []
+    candidates = {}
     while pending:
         dir_path = pending.popleft()
         index_listing = bundle.read_index(dir_path)
@@ -43,6 +45,7 @@ def navigate_index_node(state: LegalDiscoveryState, runtime: Runtime[Context]) -
 
         for item in index_listing.items:
             cid = item.concept_id
+            candidates[cid] = {"title": item.title, "description": item.description}
             item_text = f"{item.title} {item.description} {cid}".lower()
 
             # Pure OKF heuristic navigation matching query terms against index metadata
@@ -61,7 +64,16 @@ def navigate_index_node(state: LegalDiscoveryState, runtime: Runtime[Context]) -
     if not target_concepts:
         target_concepts = list(dict.fromkeys(fallback_ids))
 
+    calls = list(state.get("model_calls", []))
+    if runtime.context.llm is not None and candidates:
+        selected, usage, reason = select_candidates(runtime.context.llm, query, candidates, "navigate")
+        calls.append(usage)
+        if selected:
+            target_concepts = list(dict.fromkeys([*state.get("target_concept_ids", []), *selected]))
+        traversal_log.append(f"[Navigate LLM] {reason}; {'selected ' + str(selected) if selected else 'using deterministic fallback'}")
+
     return {
+        "model_calls": calls,
         "target_concept_ids": target_concepts,
         "traversal_log": traversal_log,
         "iteration": state.get("iteration", 0) + 1,

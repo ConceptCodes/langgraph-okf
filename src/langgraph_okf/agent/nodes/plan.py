@@ -4,6 +4,7 @@ from typing import Any
 from langgraph.runtime import Runtime
 
 from langgraph_okf.agent.context import Context
+from langgraph_okf.agent.reasoning import select_candidates
 from langgraph_okf.agent.state import LegalDiscoveryState
 
 logger = logging.getLogger(__name__)
@@ -50,9 +51,19 @@ def plan_traversal_node(state: LegalDiscoveryState, runtime: Runtime[Context]) -
     if not matched:
         matched = subdirectories
 
+    calls = list(state.get("model_calls", []))
+    if runtime.context.llm is not None and subdirectories:
+        candidates = {directory: bundle.read_index(directory).title for directory in subdirectories}
+        selected, usage, reason = select_candidates(runtime.context.llm, query, candidates, "plan")
+        calls.append(usage)
+        if selected:
+            matched = selected
+        traversal_log.append(f"[Plan LLM] {reason}; {'selected ' + str(selected) if selected else 'using deterministic fallback'}")
+
     traversal_log.append(f"[Plan] Progressive disclosure directed agent to sections: {matched}")
 
     return {
+        "model_calls": calls,
         "active_directories": matched,
         "target_concept_ids": [item.concept_id for item in root_index.items],
         "traversal_log": traversal_log,
