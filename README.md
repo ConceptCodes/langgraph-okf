@@ -29,7 +29,7 @@ Conventional RAG chops legal documents into isolated vector chunks, losing:
 ## Architecture
 
 ```mermaid
-flowchart LR
+flowchart TD
     Plan[Plan: LLM selects sections] --> Navigate[Navigate: LLM selects concepts]
     Navigate --> Inspect[Inspect: load evidence and check trust]
     Inspect --> Review[Review: LLM selects more linked evidence]
