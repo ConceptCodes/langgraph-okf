@@ -86,7 +86,7 @@ uv sync
 Create a `.env` file (optional, defaults to deterministic fallback if no API key is provided):
 ```ini
 OPENROUTER_API_KEY=your_openrouter_api_key_here
-OPENROUTER_MODEL=google/gemini-2.5-flash
+OPENROUTER_MODEL=google/gemini-3.8-flash
 ```
 
 ---
