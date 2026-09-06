@@ -1,6 +1,6 @@
 # LangGraph OKF Consumer (Legal Knowledge Graph)
 
-A demonstration consumer for [Google's Open Knowledge Format (OKF v0.2)](https://github.com/GoogleCloudPlatform/open-knowledge-format/blob/main/SPEC.md), using LangGraph for keyword-guided graph traversal over fictional legal contracts.
+A demonstration consumer for [Google's Open Knowledge Format (OKF v0.2)](https://github.com/GoogleCloudPlatform/open-knowledge-format/blob/main/SPEC.md), using LangGraph for LLM-guided graph traversal over fictional legal contracts, with an offline keyword fallback.
 
 This is a partial implementation, not a conformance-certified consumer. The bundled
 agreements and human review records are fictional fixtures. See
@@ -28,6 +28,19 @@ Conventional RAG chops legal documents into isolated vector chunks, losing:
 
 ## Architecture
 
+```mermaid
+flowchart LR
+    Plan[Plan: LLM selects sections] --> Navigate[Navigate: LLM selects concepts]
+    Navigate --> Inspect[Inspect: load evidence and check trust]
+    Inspect --> Review[Review: LLM selects more linked evidence]
+    Review -->|More evidence, within depth limit| Inspect
+    Review -->|Enough evidence or limit reached| Compute[Compute: registered Python rules]
+    Compute --> Synthesize[Synthesize: LLM writes cited answer]
+```
+
+Without an LLM, selection and link expansion use deterministic fallbacks and
+synthesis produces an evidence report. The review step runs inside `expand.py`.
+
 ```
 langgraph-okf/
 ├── bundles/
@@ -48,6 +61,8 @@ langgraph-okf/
 │       │── trust.py              # Trust tier evaluator & freshness checker
 │       ├── agent/                    # LangGraph Workflow Layer
 │       │   ├── state.py              # LegalDiscoveryState schema
+│       │   ├── context.py            # Per-run bundle, LLM, and policy dependencies
+│       │   ├── reasoning.py          # Validated LLM selections and usage accounting
 │       │   ├── llm.py                # OpenRouter ChatOpenAI factory with custom headers
 │       │   ├── tools.py              # Attested computation execution tools
 │       │   ├── nodes/                # Individual Node Files
@@ -64,7 +79,11 @@ langgraph-okf/
     ├── test_okf_parser.py            # Permissive parsing conformance tests
     ├── test_trust_evaluator.py       # Trust signal & lifecycle verification tests
     ├── test_bundle_traversal.py      # Progressive disclosure & link resolution tests
-    └── test_agent_workflow.py        # End-to-end LangGraph agent discovery tests
+    ├── test_agent_workflow.py        # End-to-end LangGraph agent discovery tests
+    ├── test_agent_reasoning.py       # Semantic selection and bounded evidence review
+    ├── test_runtime_context.py       # Per-run dependency and policy isolation
+    ├── test_usage_metrics.py         # Token, cost, timing, and fallback reporting
+    └── test_audit_regressions.py     # Security and consumer behavior regressions
 ```
 
 ---
@@ -93,6 +112,15 @@ OPENROUTER_MODEL=google/gemini-3.8-flash
 
 ## Running the CLI
 
+Queries end with a Run Metrics table showing total time (setup and graph execution),
+LLM time, the returned model name, input/output/total tokens, and request cost in USD.
+Cost uses [OpenRouter usage accounting](https://openrouter.ai/docs/cookbook/administration/usage-accounting),
+not a hard-coded price estimate. Unreported usage or failed calls show unavailable
+values; offline runs show zero tokens and cost. Metrics aggregate all planning,
+navigation, evidence-review, and synthesis calls, with a per-call breakdown. They
+do not cover account-wide usage or separately billed SDK retry attempts. If any
+call lacks usage, the corresponding aggregate is unavailable rather than undercounted.
+
 ### 1. Run a Legal Discovery Query
 ```bash
 uv run langgraph-okf query 'What is the liability cap under the MSA, what exceptions apply, and how does a data breach affect it with $100,000 in fees?'
@@ -108,6 +136,16 @@ uv run langgraph-okf inspect contracts/msa/clauses/limitation_of_liability
 uv run langgraph-okf list
 ```
 
+### 4. Test Semantic Retrieval or Offline Mode
+```bash
+uv run langgraph-okf query 'What remedies are available if the platform goes dark?'
+OPENROUTER_API_KEY='' uv run langgraph-okf query 'What notice is required for termination?'
+```
+
+The final answer appears in the **Grounded Evidence & Synthesis** panel, followed
+by **Run Metrics** and, for live runs, **LLM Calls**. The traversal log records model
+selections and fallbacks. Keep dollar amounts inside single quotes to prevent shell expansion.
+
 ---
 
 ## Running Tests
@@ -120,6 +158,18 @@ uv run ruff check src tests
 Tests force offline mode and use the sample bundle, regardless of local `.env` credentials.
 
 ## Consumer behavior and limits
+
+With an LLM configured, planning selects sections from directory indexes and
+navigation selects concepts from index titles/descriptions. After inspection, the
+LLM reviews retrieved evidence and can request more offered linked concepts or stop.
+Each selection is checked against the candidate IDs; arbitrary paths are rejected.
+Malformed or failed selection calls use deterministic traversal as a fallback.
+Empty planning/navigation selections also fall back; an empty review selection stops expansion.
+Trust checks and registered Python calculations remain deterministic.
+
+There are at most `MAX_TRAVERSAL_DEPTH + 3` application-level LLM calls: planning,
+navigation, one review per expansion round, and synthesis. Phases without candidates
+are skipped. SDK retries may add network requests. Offline mode uses no LLM calls.
 
 The graph uses [LangGraph runtime context](https://docs.langchain.com/oss/python/langgraph/graph-api#runtime-context).
 Every node accepts `Runtime[Context]`. Each invocation supplies one bundle instance,
@@ -158,7 +208,8 @@ with different contexts, including concurrent calls.
 - Calculation outputs are local results, not independently attested receipts.
 - Offline output includes the retrieved text and citations; it is an evidence report,
   not a substitute for legal interpretation. Configuring an API key enables sending
-  the query and retrieved evidence to OpenRouter for synthesis.
+  the query, index metadata, and retrieved evidence to OpenRouter for selection,
+  evidence review, and synthesis.
 - The parser supports inline Markdown links, not the full CommonMark link grammar.
   Legacy v0.1 provenance conversion and external computation runtimes are not implemented.
 - Run CLI examples from the repository root, or set `BUNDLE_PATH` to an absolute directory.
