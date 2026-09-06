@@ -1,4 +1,4 @@
-from typing import Any, TypedDict
+from typing import Any, NotRequired, TypedDict
 
 
 class ConceptDetail(TypedDict, total=False):
@@ -12,6 +12,17 @@ class ConceptDetail(TypedDict, total=False):
     body: str
     links: list[dict[str, str]]
     trust_advisories: list[str]
+
+
+class ModelUsage(TypedDict):
+    phase: NotRequired[str]
+    model: str
+    status: str
+    elapsed_seconds: float
+    input_tokens: int | None
+    output_tokens: int | None
+    total_tokens: int | None
+    cost_usd: float | None
 
 
 class LegalDiscoveryState(TypedDict, total=False):
@@ -29,5 +40,7 @@ class LegalDiscoveryState(TypedDict, total=False):
     traversal_log: list[str]
     # Output
     final_response: str
+    model_usage: ModelUsage
+    model_calls: list[ModelUsage]
     iteration: int
     expansion_depth: int

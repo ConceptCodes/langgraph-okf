@@ -1,4 +1,5 @@
 import argparse
+from time import perf_counter
 
 from rich.console import Console
 from rich.markdown import Markdown
@@ -7,11 +8,34 @@ from rich.table import Table
 
 from langgraph_okf.agent.context import Context
 from langgraph_okf.agent.graph import build_legal_discovery_graph
-from langgraph_okf.agent.state import LegalDiscoveryState
+from langgraph_okf.agent.state import LegalDiscoveryState, ModelUsage
 from langgraph_okf.bundle import OKFBundle
 from langgraph_okf.settings import settings
 
 console = Console()
+
+
+def print_run_metrics(usage: ModelUsage, elapsed_seconds: float, calls: list[ModelUsage] | None = None) -> None:
+    table = Table(title="Run Metrics", show_header=False)
+    table.add_row("Total elapsed", f"{elapsed_seconds:.2f}s")
+    table.add_row("Model", usage["model"])
+    table.add_row("LLM status", usage["status"])
+    table.add_row("LLM elapsed", f"{usage['elapsed_seconds']:.2f}s")
+    for key, label in (("input_tokens", "Input tokens"), ("output_tokens", "Output tokens"), ("total_tokens", "Total tokens")):
+        value = usage[key]
+        table.add_row(label, f"{value:,}" if value is not None else "Unavailable")
+    cost = usage["cost_usd"]
+    table.add_row("Cost (USD)", f"${cost:.8f}" if cost is not None else "Unavailable (not reported)")
+    console.print(table)
+    if calls:
+        detail = Table(title="LLM Calls")
+        for label in ("Phase", "Model", "Status", "Time", "Input", "Output", "Total", "Cost (USD)"):
+            detail.add_column(label)
+        for call in calls:
+            detail.add_row(call.get("phase", "unknown"), call["model"], call["status"], f"{call['elapsed_seconds']:.2f}s",
+                           *(str(call[key]) if call[key] is not None else "Unavailable" for key in ("input_tokens", "output_tokens", "total_tokens")),
+                           f"${call['cost_usd']:.8f}" if call["cost_usd"] is not None else "Unavailable")
+        console.print(detail)
 
 
 def cmd_query(query_text: str) -> None:
@@ -20,12 +44,14 @@ def cmd_query(query_text: str) -> None:
     """
     console.print(Panel(f"[bold cyan]Legal Inquiry:[/bold cyan] {query_text}", title="LangGraph OKF Consumer"))
 
+    started = perf_counter()
     graph = build_legal_discovery_graph()
     context = Context.from_settings(settings)
     state: LegalDiscoveryState = {"query": query_text}
 
     with console.status("[bold green]Traversing OKF Knowledge Graph via Progressive Disclosure...[/bold green]"):
         result = graph.invoke(state, context=context, config=context.invocation_config)
+    elapsed_seconds = perf_counter() - started
 
     traversal_log = result.get("traversal_log", [])
     inspected = result.get("inspected_concepts", {})
@@ -86,6 +112,7 @@ def cmd_query(query_text: str) -> None:
 
     # Final Legal Opinion
     console.print(Panel(Markdown(final_response), title="[bold green]Grounded Evidence & Synthesis[/bold green]", border_style="green"))
+    print_run_metrics(result["model_usage"], elapsed_seconds, result.get("model_calls"))
 
 
 def cmd_inspect(concept_id: str) -> None:

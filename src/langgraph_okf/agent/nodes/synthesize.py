@@ -5,6 +5,7 @@ from langchain_core.messages import HumanMessage, SystemMessage
 from langgraph.runtime import Runtime
 
 from langgraph_okf.agent.context import Context
+from langgraph_okf.agent.reasoning import call_model, summarize_usage
 from langgraph_okf.agent.state import LegalDiscoveryState
 
 logger = logging.getLogger(__name__)
@@ -69,17 +70,19 @@ def synthesize_opinion_node(state: LegalDiscoveryState, runtime: Runtime[Context
     )
 
     final_response = ""
-
-    # Use the run's injected client, if provided.
+    calls = list(state.get("model_calls", []))
     if runtime.context.llm is not None:
-        try:
-            llm = runtime.context.llm
-            response = llm.invoke([SystemMessage(content=SYSTEM_PROMPT), HumanMessage(content=prompt)])
+        response, usage, error = call_model(
+            runtime.context.llm,
+            [SystemMessage(content=SYSTEM_PROMPT), HumanMessage(content=prompt)],
+            "synthesize",
+        )
+        calls.append(usage)
+        if error:
+            traversal_log.append(f"[Synthesize Warning] LLM call failed ({error}); used structured legal synthesis fallback.")
+        else:
             final_response = str(response.content)
             traversal_log.append("[Synthesize] Generated response via the configured LLM.")
-        except Exception as e:
-            logger.warning(f"OpenRouter LLM synthesis failed, falling back to deterministic synthesis: {e}")
-            traversal_log.append(f"[Synthesize Warning] LLM call failed ({e}); used structured legal synthesis fallback.")
 
     if not final_response:
         # High-fidelity deterministic synthesis fallback (used for tests or offline execution)
@@ -114,6 +117,8 @@ def synthesize_opinion_node(state: LegalDiscoveryState, runtime: Runtime[Context
 
     return {
         "final_response": final_response,
+        "model_usage": summarize_usage(calls),
+        "model_calls": calls,
         "traversal_log": traversal_log,
         "iteration": state.get("iteration", 0) + 1,
     }
