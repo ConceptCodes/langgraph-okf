@@ -1,2 +1,6 @@
 def main() -> None:
-    print("Hello from langgraph-okf!")
+    from langgraph_okf.cli import main as cli_main
+
+    cli_main()
+
+__all__ = ["main"]
