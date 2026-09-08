@@ -18,3 +18,5 @@ If Monthly Uptime falls below 99.9%, Customer is eligible for [Service Credits](
 
 ## Claim Requirement
 Customer must submit a written credit claim within thirty (30) days of the end of the month in which the downtime occurred.
+
+See computational schedule in [SLA Service Credit Computation](/computations/sla_credit.md).

@@ -11,6 +11,32 @@ from langgraph_okf.agent.state import LegalDiscoveryState
 
 logger = logging.getLogger(__name__)
 
+# ---------------------------------------------------------------------------
+# Legal topic relevance rules
+# Each entry is (query_keywords, item_keywords): a concept is relevant if the
+# query contains ANY query keyword AND the item text contains ANY item keyword.
+# Keeping this as a module-level table makes legal/product review straightforward.
+# ---------------------------------------------------------------------------
+_LEGAL_TOPIC_RULES: list[tuple[frozenset[str], frozenset[str]]] = [
+    (frozenset({"liabilit", "cap"}),                 frozenset({"liability", "fee", "supercap"})),
+    (frozenset({"terminat", "cancel"}),               frozenset({"terminat", "breach", "notice"})),
+    (frozenset({"breach", "data", "security"}),       frozenset({"breach", "incident", "supercap", "retention", "sub-processor"})),
+    (frozenset({"confidential", "secret"}),           frozenset({"confidential"})),
+    (frozenset({"sla", "uptime", "downtime", "credit"}), frozenset({"sla", "uptime", "credit", "remed"})),
+    (frozenset({"indemnif", "infring"}),              frozenset({"indemnif", "infring", "intellectual", "ip"})),
+    (frozenset({"dispute", "arbitrat", "mediat"}),    frozenset({"dispute", "arbitrat", "mediat"})),
+    (frozenset({"warrant", "disclaimer", "as is"}),   frozenset({"warrant", "disclaimer"})),
+    (frozenset({"force majeure", "act of god"}),      frozenset({"force majeure", "excused"})),
+]
+
+
+def _is_topic_relevant(query: str, item_text: str) -> bool:
+    """Return True if the query+item pair matches any registered legal topic rule."""
+    return any(
+        any(qk in query for qk in query_keys) and any(ik in item_text for ik in item_keys)
+        for query_keys, item_keys in _LEGAL_TOPIC_RULES
+    )
+
 
 def navigate_index_node(state: LegalDiscoveryState, runtime: Runtime[Context]) -> dict[str, Any]:
     """
@@ -52,8 +78,8 @@ def navigate_index_node(state: LegalDiscoveryState, runtime: Runtime[Context]) -
             relevance_keywords = [word for word in query.split() if len(word) > 3]
             is_relevant = any(kw in item_text for kw in relevance_keywords)
 
-            # Special legal topic associations
-            if ("liabilit" in query or "cap" in query) and ("liability" in item_text or "fee" in item_text or "supercap" in item_text) or ("terminat" in query or "cancel" in query) and ("terminat" in item_text or "breach" in item_text or "notice" in item_text) or ("breach" in query or "data" in query or "security" in query) and ("breach" in item_text or "incident" in item_text or "supercap" in item_text) or ("confidential" in query or "secret" in query) and ("confidential" in item_text):
+            # Special legal topic associations — table-driven for auditability
+            if _is_topic_relevant(query, item_text):
                 is_relevant = True
 
             if is_relevant and cid not in target_concepts:

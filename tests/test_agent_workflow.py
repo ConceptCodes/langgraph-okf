@@ -58,3 +58,44 @@ def test_termination_notice_discovery(context) -> None:
     assert notice_calc is not None
     assert notice_calc.get("immediate") is True or notice_calc.get("cure_period_days") == 30
     assert len(final_response) > 50
+
+
+def test_sla_service_credit_discovery_and_computation(context) -> None:
+    graph = build_legal_discovery_graph()
+    initial_state: LegalDiscoveryState = {
+        "query": "What service credit is owed under the SLA for 98.5% uptime with a $10,000 monthly fee?",
+    }
+
+    result = graph.invoke(initial_state, context=context, config=context.invocation_config)
+
+    inspected = result.get("inspected_concepts", {})
+    computations = result.get("computation_results", [])
+    final_response = result.get("final_response", "")
+
+    # Check that SLA clauses and computations were discovered
+    assert any("sla" in cid for cid in inspected)
+    assert "computations/sla_credit" in inspected
+
+    # Check computation output
+    assert len(computations) > 0
+    sla_calc = next((c for c in computations if c.get("computation_id") == "computations/sla_credit"), None)
+    assert sla_calc is not None
+    assert sla_calc.get("credit_pct") == 25
+    assert sla_calc.get("credit_amount") == 2500.0
+    assert sla_calc.get("is_eligible") is True
+    assert "SLA Section 4" in sla_calc.get("governing_clause", "")
+    assert len(final_response) > 50
+
+
+def test_indemnification_and_dispute_resolution_discovery(context) -> None:
+    graph = build_legal_discovery_graph()
+    initial_state: LegalDiscoveryState = {
+        "query": "What are the indemnification obligations for IP infringement and what dispute resolution steps are required?",
+    }
+
+    result = graph.invoke(initial_state, context=context, config=context.invocation_config)
+
+    inspected = result.get("inspected_concepts", {})
+    assert "contracts/msa/clauses/indemnification" in inspected
+    assert "contracts/msa/clauses/dispute_resolution" in inspected
+    assert any("intellectual_property" in cid for cid in inspected)

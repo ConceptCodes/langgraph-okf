@@ -36,11 +36,13 @@ def plan_traversal_node(state: LegalDiscoveryState, runtime: Runtime[Context]) -
         selected_dirs.extend(["contracts/msa", "contracts/dpa", "computations", "definitions"])
     if any(k in q_lower for k in ("terminat", "cure", "convenience", "insolven", "bankrupt")):
         selected_dirs.extend(["contracts/msa", "computations", "definitions"])
-    if any(k in q_lower for k in ("breach", "incident", "security", "dpa", "gdpr", "privacy")):
+    if any(k in q_lower for k in ("breach", "incident", "security", "dpa", "gdpr", "privacy", "retention", "sub-processor")):
         selected_dirs.extend(["contracts/dpa", "contracts/msa", "definitions"])
     if any(k in q_lower for k in ("sla", "uptime", "credit", "availability", "downtime")):
-        selected_dirs.extend(["contracts/sla", "contracts/msa", "definitions"])
+        selected_dirs.extend(["contracts/sla", "contracts/msa", "computations", "definitions"])
     if any(k in q_lower for k in ("confidential", "proprietary", "trade secret", "disclosure")):
+        selected_dirs.extend(["contracts/msa", "definitions"])
+    if any(k in q_lower for k in ("dispute", "arbitrat", "mediat", "warrant", "disclaimer", "force majeure", "ip", "intellectual property")):
         selected_dirs.extend(["contracts/msa", "definitions"])
     if not selected_dirs:
         # Default progressive disclosure fallback: start with primary contracts & definitions
@@ -53,7 +55,17 @@ def plan_traversal_node(state: LegalDiscoveryState, runtime: Runtime[Context]) -
 
     calls = list(state.get("model_calls", []))
     if runtime.context.llm is not None and subdirectories:
-        candidates = {directory: bundle.read_index(directory).title for directory in subdirectories}
+        # Build candidates from the already-loaded root index to avoid re-reading
+        # every child directory index just to get their titles.
+        candidates = {
+            item.path.rstrip("/"): f"{item.title} — {item.description}".strip(" —")
+            for item in root_index.items
+            if item.path.rstrip("/") in subdirectories
+        }
+        # Fall back to bare directory names for any subdirectories not listed in root index items
+        for d in subdirectories:
+            if d not in candidates:
+                candidates[d] = d
         selected, usage, reason = select_candidates(runtime.context.llm, query, candidates, "plan")
         calls.append(usage)
         if selected:

@@ -119,6 +119,12 @@ def test_unknown_computation_and_scenarios_rejected(sample):
         execute_attested_computation(concept, {"fees_last_12_months": 1})
     with pytest.raises(ValueError, match="Unknown termination"):
         execute_attested_computation(sample.get_concept("computations/termination_notice"), {"termination_reason": "typo"})
+    with pytest.raises(ValueError, match="uptime percentage"):
+        execute_attested_computation(sample.get_concept("computations/sla_credit"), {"monthly_uptime_pct": 105, "monthly_fee": 1000})
+    with pytest.raises(ValueError, match="uptime percentage"):
+        execute_attested_computation(sample.get_concept("computations/sla_credit"), {"monthly_uptime_pct": -5, "monthly_fee": 1000})
+    with pytest.raises(ValueError, match="Monthly fee"):
+        execute_attested_computation(sample.get_concept("computations/sla_credit"), {"monthly_uptime_pct": 98, "monthly_fee": -100})
 
 
 @pytest.mark.parametrize("amount", ["", "$100k", "$100 and $200", "$-100"])

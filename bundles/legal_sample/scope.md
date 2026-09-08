@@ -24,10 +24,13 @@ that a negotiated term is enforceable or that these fictional clauses were revie
   combined recovery limit.
 - Notice calculations return durations, not calendar deadlines. They do not establish
   receipt dates, enforceability, or completion of written-notice requirements.
+- Service credit calculations compute estimated percentages and dollar amounts from SLA
+  Section 4 for explicitly supplied monthly fees and uptime percentages. They do not resolve
+  claim submission timing or force majeure exclusions.
 
 # Execution and trust
 
-The consumer runs two registered local Python rules. Bundle code and resource URLs
+The consumer runs three registered local Python rules. Bundle code and resource URLs
 are never executed. There is no independent receipt attester; results explicitly
 report `attestation_verified: false`. A matching executor name is routing metadata,
 not proof that a document or result has been authenticated.

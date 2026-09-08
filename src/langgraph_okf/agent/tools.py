@@ -3,6 +3,16 @@ from typing import Any
 
 from langgraph_okf.models import AttestationSpec, Concept
 
+# ---------------------------------------------------------------------------
+# Claim-type keyword vocabulary — single source of truth shared with compute.py.
+# Keys are canonical claim_type values accepted by execute_attested_computation.
+# Values are query substrings that indicate that claim type is relevant.
+# ---------------------------------------------------------------------------
+CLAIM_TYPE_KEYWORDS: dict[str, list[str]] = {
+    "data_breach": ["data breach", "data protection", "dpa", "gdpr", "privacy"],
+    "uncapped": ["confidential", "willful", "fraud", "gross negligence", "unpaid fees"],
+}
+
 
 def execute_attested_computation(concept: Concept, params: dict[str, Any]) -> dict[str, Any]:
     """
@@ -18,6 +28,7 @@ def execute_attested_computation(concept: Concept, params: dict[str, Any]) -> di
     executors = {
         "computations/liability_cap": "liability_calc_v1",
         "computations/termination_notice": "notice_period_calc_v1",
+        "computations/sla_credit": "sla_credit_calc_v1",
     }
     spec = concept.frontmatter.computation
     executor = concept.frontmatter.executor
@@ -104,5 +115,39 @@ def execute_attested_computation(concept: Concept, params: dict[str, Any]) -> di
                 "governing_clause": "MSA Section 14.2(1)",
                 "explanation": "Termination requires a breach remaining uncured for 30 days after receipt of written notice.",
             }
+
+    elif cid == "computations/sla_credit":
+        uptime = float(params["monthly_uptime_pct"])
+        fee = float(params["monthly_fee"])
+        if not math.isfinite(uptime) or uptime < 0 or uptime > 100:
+            raise ValueError("Monthly uptime percentage must be finite and between 0 and 100.")
+        if not math.isfinite(fee) or fee < 0 or not math.isfinite(fee * 0.5):
+            raise ValueError("Monthly fee must be finite, nonnegative, and within numeric range.")
+
+        if uptime >= 99.9:
+            return {
+                "computation_id": cid,
+                "credit_pct": 0,
+                "credit_amount": 0.0,
+                "is_eligible": False,
+                "governing_clause": "SLA Section 4",
+                "explanation": f"Uptime of {uptime:.2f}% meets or exceeds the 99.9% SLA commitment; no service credit is due.",
+            }
+        elif uptime >= 99.0:
+            pct = 10
+        elif uptime >= 95.0:
+            pct = 25
+        else:
+            pct = 50
+
+        credit = round((pct / 100.0) * fee, 2)
+        return {
+            "computation_id": cid,
+            "credit_pct": pct,
+            "credit_amount": credit,
+            "is_eligible": True,
+            "governing_clause": "SLA Section 4",
+            "explanation": f"{pct}% service credit applies for {uptime:.2f}% uptime: ${credit:,.2f}",
+        }
 
     raise ValueError(f"Unsupported computation: {cid}")
