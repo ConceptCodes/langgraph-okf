@@ -9,6 +9,7 @@ from rich.console import Console
 
 from langgraph_okf import cli
 from langgraph_okf.agent.nodes.synthesize import synthesize_opinion_node
+from langgraph_okf.agent.reasoning import summarize_usage
 
 
 @pytest.mark.parametrize("cost", [0.00123456, 0.0, None])
@@ -18,7 +19,8 @@ def test_reported_usage_and_cost(context, cost):
         "model_name": "actual-model",
         "token_usage": {"prompt_tokens": 120, "completion_tokens": 30, "total_tokens": 150, "cost": cost},
     })
-    usage = synthesize_opinion_node({"query": "test"}, Runtime(context=replace(context, llm=llm)))["model_usage"]
+    result = synthesize_opinion_node({"query": "test"}, Runtime(context=replace(context, llm=llm)))
+    usage = summarize_usage(result["model_calls"])
     assert usage["model"] == "actual-model"
     assert usage["input_tokens"] == 120
     assert usage["output_tokens"] == 30
@@ -30,7 +32,8 @@ def test_reported_usage_and_cost(context, cost):
 def test_normalized_tokens_without_price(context):
     llm = Mock(model_name="test-model")
     llm.invoke.return_value = AIMessage(content="Answer", usage_metadata={"input_tokens": 4, "output_tokens": 2, "total_tokens": 6})
-    usage = synthesize_opinion_node({}, Runtime(context=replace(context, llm=llm)))["model_usage"]
+    result = synthesize_opinion_node({}, Runtime(context=replace(context, llm=llm)))
+    usage = summarize_usage(result["model_calls"])
     assert usage["total_tokens"] == 6
     assert usage["cost_usd"] is None
 
@@ -38,14 +41,16 @@ def test_normalized_tokens_without_price(context):
 def test_failed_call_does_not_claim_zero_cost(context):
     llm = Mock(model_name="test-model")
     llm.invoke.side_effect = RuntimeError("Request failed")
-    usage = synthesize_opinion_node({}, Runtime(context=replace(context, llm=llm)))["model_usage"]
+    result = synthesize_opinion_node({}, Runtime(context=replace(context, llm=llm)))
+    usage = summarize_usage(result["model_calls"])
     assert usage["status"] == "partial/failed"
     assert usage["total_tokens"] is None
     assert usage["cost_usd"] is None
 
 
 def test_offline_metrics_and_cli_display(context, monkeypatch):
-    usage = synthesize_opinion_node({}, Runtime(context=context))["model_usage"]
+    result = synthesize_opinion_node({}, Runtime(context=context))
+    usage = summarize_usage(result["model_calls"])
     assert usage["total_tokens"] == 0
     assert usage["cost_usd"] == 0
     output = StringIO()

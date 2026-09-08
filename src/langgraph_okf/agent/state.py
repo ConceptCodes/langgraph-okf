@@ -40,7 +40,8 @@ class LegalDiscoveryState(TypedDict, total=False):
     traversal_log: list[str]
     # Output
     final_response: str
-    model_usage: ModelUsage
+    # model_usage is intentionally absent — derive it from model_calls via
+    # summarize_usage() at display time rather than storing redundant state.
     model_calls: list[ModelUsage]
     iteration: int
     expansion_depth: int

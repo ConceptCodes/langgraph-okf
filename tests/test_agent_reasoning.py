@@ -6,7 +6,7 @@ from langchain_core.messages import AIMessage
 
 from langgraph_okf.agent.context import Context
 from langgraph_okf.agent.graph import build_legal_discovery_graph
-from langgraph_okf.agent.reasoning import select_candidates
+from langgraph_okf.agent.reasoning import select_candidates, summarize_usage
 from langgraph_okf.bundle import OKFBundle
 
 
@@ -33,8 +33,9 @@ def test_semantic_selection_review_and_aggregated_usage(tmp_path):
     assert set(result["inspected_concepts"]) == {"terms/uptime", "terms/remedy"}
     assert result["final_response"] == "Grounded answer"
     assert [c["phase"] for c in result["model_calls"]] == ["plan", "navigate", "review", "review", "synthesize"]
-    assert result["model_usage"]["total_tokens"] == 75
-    assert result["model_usage"]["cost_usd"] == 0.005
+    usage = summarize_usage(result["model_calls"])
+    assert usage["total_tokens"] == 75
+    assert usage["cost_usd"] == 0.005
 
 
 def test_invalid_selection_falls_back_without_loading_invented_path(context):
@@ -57,4 +58,4 @@ def test_malformed_selection_keeps_deterministic_workflow(context):
 def test_offline_mode_makes_no_model_calls(context):
     result = build_legal_discovery_graph().invoke({"query": "liability cap"}, context=context)
     assert result["model_calls"] == []
-    assert result["model_usage"]["cost_usd"] == 0
+    assert summarize_usage(result["model_calls"])["cost_usd"] == 0

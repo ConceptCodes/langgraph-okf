@@ -5,7 +5,7 @@ from langchain_core.messages import HumanMessage, SystemMessage
 from langgraph.runtime import Runtime
 
 from langgraph_okf.agent.context import Context
-from langgraph_okf.agent.reasoning import call_model, summarize_usage
+from langgraph_okf.agent.reasoning import call_model
 from langgraph_okf.agent.state import LegalDiscoveryState
 
 logger = logging.getLogger(__name__)
@@ -59,7 +59,7 @@ def synthesize_opinion_node(state: LegalDiscoveryState, runtime: Runtime[Context
 
     advisory_text = ""
     if advisories:
-        advisory_text = "### Trust Advisories & Warnings:\n" + "\n".join(f"- ⚠️ {a}" for a in set(advisories))
+        advisory_text = "### Trust Advisories & Warnings:\n" + "\n".join(f"- ⚠️ {a}" for a in dict.fromkeys(advisories))
 
     prompt = (
         f"User Inquiry: {query}\n\n"
@@ -117,7 +117,6 @@ def synthesize_opinion_node(state: LegalDiscoveryState, runtime: Runtime[Context
 
     return {
         "final_response": final_response,
-        "model_usage": summarize_usage(calls),
         "model_calls": calls,
         "traversal_log": traversal_log,
         "iteration": state.get("iteration", 0) + 1,

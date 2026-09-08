@@ -8,6 +8,7 @@ from rich.table import Table
 
 from langgraph_okf.agent.context import Context
 from langgraph_okf.agent.graph import build_legal_discovery_graph
+from langgraph_okf.agent.reasoning import summarize_usage
 from langgraph_okf.agent.state import LegalDiscoveryState, ModelUsage
 from langgraph_okf.bundle import OKFBundle
 from langgraph_okf.settings import settings
@@ -103,7 +104,7 @@ def cmd_query(query_text: str) -> None:
     # Display Trust Advisories if any
     if advisories:
         adv_panel = Panel(
-            "\n".join(f"• {a}" for a in set(advisories)),
+            "\n".join(f"• {a}" for a in dict.fromkeys(advisories)),
             title="[bold yellow]⚠️ Trust Advisories & Lifecycle Warnings[/bold yellow]",
             border_style="yellow",
         )
@@ -112,7 +113,7 @@ def cmd_query(query_text: str) -> None:
 
     # Final Legal Opinion
     console.print(Panel(Markdown(final_response), title="[bold green]Grounded Evidence & Synthesis[/bold green]", border_style="green"))
-    print_run_metrics(result["model_usage"], elapsed_seconds, result.get("model_calls"))
+    print_run_metrics(summarize_usage(result.get("model_calls", [])), elapsed_seconds, result.get("model_calls"))
 
 
 def cmd_inspect(concept_id: str) -> None:
