@@ -22,3 +22,7 @@ In the event of any conflict between the terms of this Agreement and any addenda
 - [Confidentiality](clauses/confidentiality.md)
 - [Termination](clauses/termination.md)
 - [Governing Law](clauses/governing_law.md)
+- [Indemnification](clauses/indemnification.md)
+- [Warranties & Disclaimers](clauses/warranties.md)
+- [Dispute Resolution](clauses/dispute_resolution.md)
+- [Force Majeure](clauses/force_majeure.md)

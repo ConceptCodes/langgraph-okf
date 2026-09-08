@@ -16,3 +16,9 @@ This Data Processing Addendum supplements the [Master Services Agreement](/contr
 
 ## Precedence Rule
 Pursuant to Section 1.2, in the event of any conflict between the terms of this DPA and the MSA concerning the protection of Customer Personal Data or regulatory privacy obligations, the provisions of this DPA shall govern and control.
+
+## Key Provisions
+- [Liability Supercap](clauses/liability_supercap.md)
+- [Security Incident Notification](clauses/security_incident_notification.md)
+- [Data Retention & Deletion](clauses/data_retention.md)
+- [Sub-Processors](clauses/sub_processors.md)
