@@ -52,8 +52,8 @@ def test_freshness_and_superseded_detection(tmp_path: Path) -> None:
         ),
         body="content",
     )
-    enrich_concept_trust(c, current_time=datetime(2026, 6, 1, tzinfo=UTC))
-    assert c.is_stale is True
-    assert len(c.trust_advisories) == 2
-    assert any("SUPERSEDED" in adv for adv in c.trust_advisories)
-    assert any("expired" in adv for adv in c.trust_advisories)
+    enriched = enrich_concept_trust(c, current_time=datetime(2026, 6, 1, tzinfo=UTC))
+    assert enriched.is_stale is True
+    assert len(enriched.trust_advisories) == 2
+    assert any("SUPERSEDED" in adv for adv in enriched.trust_advisories)
+    assert any("expired" in adv for adv in enriched.trust_advisories)

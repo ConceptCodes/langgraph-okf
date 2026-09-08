@@ -82,12 +82,14 @@ def evaluate_lifecycle_and_freshness(
 
 def enrich_concept_trust(concept: Concept, current_time: datetime | None = None) -> Concept:
     """
-    Calculates and populates trust tier and advisories on a Concept object.
+    Returns a new Concept with trust_tier, is_stale, and trust_advisories populated.
+    Uses model_copy() to avoid mutating the caller's object; safe to call multiple
+    times on the same instance (e.g. with different current_time values).
     """
     tier = evaluate_trust_tier(concept)
     stale, advisories = evaluate_lifecycle_and_freshness(concept, current_time)
-
-    concept.trust_tier = tier
-    concept.is_stale = stale
-    concept.trust_advisories = advisories
-    return concept
+    return concept.model_copy(update={
+        "trust_tier": tier,
+        "is_stale": stale,
+        "trust_advisories": advisories,
+    })

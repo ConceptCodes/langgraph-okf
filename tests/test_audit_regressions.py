@@ -80,10 +80,11 @@ def test_nested_navigation_and_index_cycle(tmp_path, monkeypatch):
 
 def test_invalid_optional_metadata_preserves_lifecycle_and_dates(tmp_path):
     concept = parse_concept_content("---\ntype: Clause\nstatus: deprecated\nstale_after: 2026-01-01\ntags: 42\n---\nbody", tmp_path / "x.md", tmp_path)
-    enrich_concept_trust(concept, datetime(2026, 1, 1))
-    assert concept.frontmatter.status == "deprecated"
-    assert concept.is_stale
-    assert len(concept.trust_advisories) == 2
+    enriched = enrich_concept_trust(concept, datetime(2026, 1, 1))
+    assert enriched.frontmatter.status == "deprecated"
+    assert enriched.is_stale
+    assert len(enriched.trust_advisories) == 2
+
 
 
 @pytest.mark.parametrize("verified,expected", [
