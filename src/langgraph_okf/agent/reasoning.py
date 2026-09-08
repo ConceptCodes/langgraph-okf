@@ -8,9 +8,16 @@ from langgraph_okf.agent.state import ModelUsage
 
 def call_model(llm, messages, phase: str):
     """Record every application-level attempt, including failed calls."""
-    usage = ModelUsage(model=str(getattr(llm, "model_name", None) or getattr(llm, "model", None) or type(llm).__name__),
-                       status="failed", elapsed_seconds=0.0, input_tokens=None,
-                       output_tokens=None, total_tokens=None, cost_usd=None)
+    model_name = str(getattr(llm, "model_name", None) or getattr(llm, "model", None) or type(llm).__name__)
+    usage = ModelUsage(
+        model=model_name,
+        status="failed",
+        elapsed_seconds=0.0,
+        input_tokens=None,
+        output_tokens=None,
+        total_tokens=None,
+        cost_usd=None,
+    )
     usage["phase"] = phase
     start = perf_counter()
     response, error = None, None
@@ -19,10 +26,14 @@ def call_model(llm, messages, phase: str):
         metadata = response.response_metadata
         raw = metadata.get("token_usage") or {}
         normalized = getattr(response, "usage_metadata", None) or {}
-        usage.update(model=metadata.get("model_name") or metadata.get("model") or usage["model"], status="success",
-                     input_tokens=raw.get("prompt_tokens", normalized.get("input_tokens")),
-                     output_tokens=raw.get("completion_tokens", normalized.get("output_tokens")),
-                     total_tokens=raw.get("total_tokens", normalized.get("total_tokens")), cost_usd=raw.get("cost"))
+        usage.update(
+            model=metadata.get("model_name") or metadata.get("model") or usage["model"],
+            status="success",
+            input_tokens=raw.get("prompt_tokens", normalized.get("input_tokens")),
+            output_tokens=raw.get("completion_tokens", normalized.get("output_tokens")),
+            total_tokens=raw.get("total_tokens", normalized.get("total_tokens")),
+            cost_usd=raw.get("cost"),
+        )
     except Exception as exc:
         error = str(exc)
     finally:

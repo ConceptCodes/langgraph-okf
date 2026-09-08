@@ -32,9 +32,9 @@ class Context:
     @classmethod
     def from_settings(cls, config: Settings) -> Context:
         """Construct dependencies once at the application boundary."""
-        llm = None
-        if config.openrouter_api_key and not config.openrouter_api_key.startswith("sk-dummy"):
-            llm = get_openrouter_llm(config)
+        # Initialise the LLM only when a key is present; let OpenRouter surface
+        # any authentication error rather than guessing on key format here.
+        llm = get_openrouter_llm(config) if config.openrouter_api_key else None
         return cls(
             bundle=OKFBundle(config.bundle_path),
             llm=llm,

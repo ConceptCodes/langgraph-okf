@@ -3,7 +3,9 @@ import os
 from pathlib import Path
 from urllib.parse import unquote, urlsplit
 
-from langgraph_okf.models import Concept, IndexItem, IndexListing, TrustTier
+import frontmatter as _fm
+
+from langgraph_okf.models import Concept, ConceptFrontmatter, IndexItem, IndexListing, TrustTier
 from langgraph_okf.parser import parse_concept_file, parse_index_file
 from langgraph_okf.trust import enrich_concept_trust
 
@@ -165,6 +167,20 @@ class OKFBundle:
                     concept_ids.append(str(rel.with_suffix("")).replace("\\", "/"))
         return sorted(concept_ids)
 
+    def _scan_frontmatter(self, concept_id: str) -> ConceptFrontmatter | None:
+        """
+        Parse only the YAML frontmatter of a concept — no body loading, no trust enrichment.
+        Used as a cheap pre-filter before calling the heavier get_concept() path.
+        """
+        path = self.resolve_concept_path(concept_id)
+        if not path:
+            return None
+        try:
+            metadata = dict(_fm.loads(path.read_text(encoding="utf-8")).metadata)
+            return ConceptFrontmatter(**metadata)
+        except Exception:
+            return None
+
     def find_concepts(
         self,
         concept_type: str | None = None,
@@ -173,15 +189,22 @@ class OKFBundle:
     ) -> list[Concept]:
         """
         Query concepts across the bundle matching type, tag, or trust requirements.
+        Cheap frontmatter fields (type, tags) are pre-filtered without loading bodies.
         """
         results: list[Concept] = []
         for cid in self.list_all_concept_ids():
             try:
+                # Pre-filter on cheap frontmatter fields to avoid loading all bodies
+                if concept_type or tag:
+                    fm = self._scan_frontmatter(cid)
+                    if fm is None:
+                        continue
+                    if concept_type and fm.type.lower() != concept_type.lower():
+                        continue
+                    if tag and tag.lower() not in [t.lower() for t in fm.tags]:
+                        continue
+                # Full load only for concepts that pass the cheap filters
                 c = self.get_concept(cid)
-                if concept_type and c.type.lower() != concept_type.lower():
-                    continue
-                if tag and tag.lower() not in [t.lower() for t in c.frontmatter.tags]:
-                    continue
                 if min_trust_tier and not c.trust_tier.meets(min_trust_tier):
                     continue
                 results.append(c)
